@@ -41,3 +41,4 @@ services:
     command: bundle exec sidekiq -r ./worker.rb
     depends_on:
       - redis
+  
