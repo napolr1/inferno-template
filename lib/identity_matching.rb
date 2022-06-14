@@ -1,4 +1,4 @@
-require_relative 'inferno_template/patient_group'
+require_relative 'identity_matching/match_operation'
 
 module InfernoTemplate
   class Suite < Inferno::TestSuite

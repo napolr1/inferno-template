@@ -181,7 +181,8 @@ module InfernoTemplate
           }
           { 'Content-Type': 'application/fhir+json' }
          
-          
+          response=JSON.parse(body)
+          puts("patientName" +   response[:total])
           fhir_operation("Patient/$match", body: body, client: :default, name: nil, headers: { 'Content-Type': 'application/fhir+json' })
 
           
