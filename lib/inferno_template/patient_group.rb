@@ -19,7 +19,7 @@ module InfernoTemplate
 
       input :patient_id
       # Named requests can be used by other tests
-      makes_request :patient
+     makes_request :patient
 
       run do
         fhir_read(:patient, patient_id, name: :patient)
@@ -44,10 +44,7 @@ module InfernoTemplate
       makes_request :match
       
       
-       # create a "default" client for a group
-      # fhir_client do
-       #  url :url
-      #end
+
       logger= Logger.new(STDOUT)
       # create a named client for a group
       fhir_client  do
@@ -178,11 +175,14 @@ module InfernoTemplate
                 "valueBoolean": "false"
               }
             ]
-          }
-          { 'Content-Type': 'application/fhir+json' }
+          } 
          
-          
+          #puts("request url=" +  url)
+          #puts("request body=" +  body)
           fhir_operation("Patient/$match", body: body, client: :default, name: nil, headers: { 'Content-Type': 'application/fhir+json' })
+
+          puts("response body=" +  response[:body])
+          #fhir_operation("Patient/$match", body: body, client: :default, name: nil, headers: { 'Content-Type': 'application/fhir+json' })
 
           
           #response_json=response[:body]
