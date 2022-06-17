@@ -44,10 +44,7 @@ module InfernoTemplate
       makes_request :match
       
       
-       # create a "default" client for a group
-      # fhir_client do
-       #  url :url
-      #end
+
       logger= Logger.new(STDOUT)
       # create a named client for a group
       fhir_client  do
