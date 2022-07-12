@@ -1,3 +1,4 @@
+require 'inferno/dsl/oauth_credentials'
 require "uri"
 require "json"
 require "net/http"
@@ -107,8 +108,8 @@ module InfernoTemplate
 						
 						curr_score= item["resource"]["score"]
 						curr_id=item["resource"]["id"]
-						puts  "Current Patient ID=#{curr_id}  Patient Score=#{curr_score}"
-						puts  "Current Patient ID=#{curr_id} "
+						#puts  "Current Patient ID=#{curr_id}  Patient Score=#{curr_score}"
+						#puts  "Current Patient ID=#{curr_id} "
 						if i  > 0 
 
 						  if prev_id.to_s >= curr_id.to_s && prev_score.to_s <= curr_score_to_s
@@ -581,7 +582,7 @@ module InfernoTemplate
 				with the level of assurance (e.g., IDI Patient 1, IDI Patient 2, etc ) asserted by the transmitting  party.'
 				description %(Match output SHOULD return records sorted by score      ) 
 				
-				
+				output :results
 				uses_request :match
 				run do
 						puts "*********************  Get Response Object ****************"
@@ -589,137 +590,178 @@ module InfernoTemplate
 						responseJSON=JSON[response_json]
 						#responseJSON=JSON.parse(tmp)
 						idi_patient_profile="http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient"
-						idi_patient_l0_profile="http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L0"
+						idi_patient_l0_profile="http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L0" 
 						idi_patient_l1_profile="http://hl7.org/fhir/us/identity-matching/StructureDefinition/IDI-Patient-L1" 
-					 
+						results=""
 						responseJSON["entry"].each do |entry|	 
 								weighted_score= 0
 
 								# Get Patient Name, Address, DOB and telecom info
 
-								#patientID=entry.resource.id
+								resourceID=entry["resource"]["id"]
 								givenName=entry["resource"]["name"][0]["given"][0]
-								familyName=entry["resource"]["name"][0]["family"]
-								homePhone=""
+								familyName=entry["resource"]["name"][0]["family"] 
+								homeAddressLine=""
+								homeAddressCity=""
 								emailAddress=""
-								PPN_ID=""
-								DL_ID=""
-								STID_ID=""
+								phoneNumber=""
+								ppn_id=""
+								other_id=""
+								dl_id=""
+								stid_id=""
 								photo=""
 								photo=entry["resource"]["photo"]
+								telecomArray=[]
+
 								telecomArray=entry["resource"]["telecom"]
-								telecomArray.each do |telecom|
-									if telecom["system"]="phone"
-										phoneNumber=telecom["value"]
-									elseif telecom["system"]="email"
-										emailAddress=telecom["value"]
-									end								 
-								end
+								puts ("telecomArray = #{telecomArray}")
+								if (  !telecomArray.nil?  ) 
+									telecomArray.each do |telecom|
+										if telecom["system"]="phone"
+											phoneNumber=telecom["value"]
+										elsif telecom["system"]="email"
+											emailAddress=telecom["value"]
+										end								 
+									end # end do
+								end #end if 
 								
-								addressLine=entry["address"][0]["line"][0]
-								addressCity=entry["address"][0]["city"]
+								
 								birthDate=entry["birthDate"]
 								identifierList= entry["resource"]["identifier"] 
 
 								#get Patient Address Info
 								addressList= entry["address"]
-								addressList.each do |address|
-									if  (  (address["use"]="home" and address["line"] != "" and address["city"] != "" ) 
-												validAddress=1											
-									end
-								end
+								if ( !addressList.nil?)
+									addressList.each do |address|
+										if  (address["use"]="home" and address["line"] != "" and address["city"] != "" ) 
+											homeAddressLine=address["line"]
+											homehomeAddressCity=address["city"]											
+										end
+									end #end do
+								end #end if
 
 								# Get Patient Identifiers
-								
-								identifierList.each do |identifier|
-									
-									thisID=identifier["type"]["text"]
-									identifier["type"].coding.each do |coding|
-										if coding.code = "PPN"  
-											PPN_ID=thisID 
-										elseif  ( ( coding.code = "STID" )
-										    STID=thisID
-										elseif ( coding.code= "DL")
-											DL_ID=thisID
-										else
-											other_id=thisID	
-										end
-									end
-								end							
+								patientID=""
+								if ( !identifierList.nil? )
+									identifierList.each do |identifier|
+										
+										thisID=identifier["type"]["text"]
+										codingArray=identifier["type"]["coding"]
+										if ( !codingArray.nil? )
+											codingArray.each do |coding|
+												code=coding["code"]
+												if code == "PPN"  
+													ppn_id=thisID 
+													patientID=thisID
+												elsif   ( code == "STID" )
+													stid_id=thisID
+													patientID=thisID
+												elsif ( code== "DL")
+													dl_id=thisID
+													patientID=thisID
+												else
+													other_id=thisID	
+													patientID=thisID
+												end
+											end #end do
+										end #end if
+									end	#end do	
+								end #end if ( identifierList != :null )
+
 								profileList= entry["resource"]["meta"]["profile"]
-								profileList.each do |profile|
-									puts "****profile=#{profile}"  
-									# Only validate Patient and Condition bundle entries. Validate Patient
-									# resources against the given profile, and Codition resources against the
-									# base FHIR Condition resource.
+								if ( !profileList.nil? )
+									idi_patient_l1=false
+									idi_patient = false
+									idi_patient_l0=false
+ 
+									profileList.each do |profile|
+										puts "****profile=#{profile}"  
+										puts ("Patient record Id = #{resourceID} ****")
+										# Only validate Patient and Condition bundle entries. Validate Patient
+										# resources against the given profile, and Codition resources against the
+										# base FHIR Condition resource.
 
 
-								 
-									if profile= idi_patient_profile
+									
+										if profile == idi_patient_profile
 
-										idi_patient = false
-										if ( (patientID!="" or telecom!=""  ) or  ( givenName!=""  && familyName!="" ) or
-											( addressLine!="" && addressCity!="" ) or brithDate!="" )
 											
-											idi_patient=true
-										end
+											if ( (patientID!="" or emailAddress != ""  or phoneNumber != "" ) or  ( givenName!=""  && familyName!="" ) or
+												( homeAddressLine!="" && homehomeAddressCity!="" ) or brithDate!="" )
+												results+="patient with Resource ID of #{resourceID} passed IDI_PATIENT Level Testing <br>"
+												idi_patient=true
+											end
+											output results: results 
+											assert idi_patient == true
 
-										assert idi_patient = true
-
-									elseif profile = idi_patient_l0_profile							
-										idi_patient_l0=false
-										if ( PPN_ID !="")
-											weighted_score=10
-										end
-										if ( DL_ID!=""  or STID_ID != "" )
-											weighted_score=weighted_score + 10
-										end
-										if ( (addressLine!="" and addressCity != "" ) or 
-											( other_id !="" ) or  
-											( emailAddress != "" or phoneNumber !="" or photo!= "" ))
-											weighted_score = weighted_score + 4
-										end 
-
-										if ( familyName != "" && givenName != "")
-											weighted_score = weighted_score + 4
-										end
-										if ( birthDate != "")
-											weighted_score += 2
-										end
-										if weighted_score >= 10 
-											idi_patient_l0=true 
-										end
-										assert idi_patient_l0 = true
-
-									elseif  profile = idi_patient_l1_profile
-										idi_patient_l1=false
-										if ( PPN_ID !="")
-											weighted_score=10
-										end
-										if ( DL_ID!=""  or STID_ID != "" )
-											weighted_score=weighted_score + 10
-										end
-										if ( (addressLine!="" and addressCity != "" ) or 
-											( other_id !="" ) or 
-											( emailAddress != "" or phoneNumber !="" or photo!= "" ))
+										elsif profile == idi_patient_l0_profile							
+											
+											if ( ppn_id !="")
+												weighted_score=10
+											end
+											if ( dl_id != ""  or stid_id != "" )
+												weighted_score=weighted_score + 10
+											end
+											if ( (homeAddressLine != "" and homehomeAddressCity != "" ) or 
+												( other_id != "" ) or  
+												( emailAddress != "" or phoneNumber != "" or photo!= "" ))
 												weighted_score = weighted_score + 4
-										end 
+											end 
 
-										if ( familyName != "" && givenName != "")
-											weighted_score = weighted_score + 4
+											if ( familyName != "" && givenName != "")
+												weighted_score = weighted_score + 4
+											end
+											if ( birthDate != "")
+												weighted_score += 2
+											end
+											if weighted_score >= 10 
+												idi_patient_l0=true 
+												results+="Patient with Resource ID of #{resourceID} passed IDI_PATIENT_0 Level Testing  - weighted score= #{weighted_score}     - "
+											end
+											output results: results 
+											assert idi_patient_l0 == true
+
+										elsif  profile == idi_patient_l1_profile
+											puts ("**** got here Patient record Id = #{resourceID} ****")
+											if ( ppn_id !="")
+												weighted_score=10
+											end
+											if ( dl_id != ""  or stid_id != "" )
+												weighted_score=weighted_score + 10
+											end
+											if ( (homeAddressLine!= "" and homehomeAddressCity != "" ) or 
+												( other_id !="" ) or 
+												( emailAddress != "" or phoneNumber != "" or photo!= "" ))
+													weighted_score = weighted_score + 4
+											end 
+
+											if ( familyName != "" && givenName != "")
+												weighted_score = weighted_score + 4
+											end
+											if ( birthDate != "")
+												weighted_score += 2
+											end
+											puts ("Patient with Resource ID of #{resourceID}  IDI_PATIENT_1 Level Testing - weighted score= #{weighted_score}        -  ")
+
+											if weighted_score >= 20 
+												idi_patient_l1=true 
+												results+="Patient with Resource ID of #{resourceID} passed IDI_PATIENT_1 Level Testing - weighted score= #{weighted_score}    -  "
+												
+											end
+											puts ( "idi_patient_l1=#{idi_patient_l1}")
+											output results: results 
+											assert idi_patient_l1 == true
+										else
+											results+="Patient with Resource ID of #{resourceID} contains an invalid Identification Level #{profile}"
+
 										end
-										if ( birthDate != "")
-											weighted_score += 2
-										end
-										if weighted_score >= 20 
-											idi_patient_l1=true 
-										end
-										assert idi_patient_l1 true
 									end
 
-						end      
-				end
-			end
+						end 
 	  
+				end
+				
+			end
 		end
-	enda
+	end
+end
