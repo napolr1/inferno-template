@@ -10,6 +10,7 @@ module InfernoTemplate
 
     # This input will be available to all tests in this suite
     input :url
+    input :access_token
 
     # All FHIR requests in this suite will use this FHIR client
     #fhir_client do
