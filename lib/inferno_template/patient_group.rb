@@ -1,4 +1,4 @@
-require 'inferno/dsl/oauth_credentials'
+
 require "uri"
 require "json"
 require "net/http"
@@ -11,7 +11,26 @@ module InfernoTemplate
 			title 'Patient  Tests'
 			description 'Verify that the server makes Patient resources available'
 			id :patient_group
+			test do
+				title 'Test whether it is possible to gain access to patient data without authenticating'
+				description %(Test whether it is possible to gain access to patient data without authenticating)  
 
+				input :search_json ,
+				type: 'textarea'
+				 
+				
+				fhir_client  do
+    			  url :url
+    			end	
+							
+		   
+				run do 
+					body = JSON[search_json] 
+				  	fhir_operation("Patient/$match", body: body, client: :default, name: :match, headers: { 'Content-Type': 'application/fhir+json' })
+  				  	assert_response_status(401) 
+					   
+				end
+			end
 				
 			test do
 			  title 'Patient match is valid'
@@ -19,10 +38,11 @@ module InfernoTemplate
 				Verify that the Patient  $match resource returned from the server is a valid FHIR resource.
 			  )
 			  
-			  input :search_json ,
-				type: 'textarea'
-			  
-			  output :response_json
+			  input 	:search_json ,
+							type: 'textarea'
+			  input  	:access_token
+			  output 	:custom_headers
+			  output 	:response_json
 			  # Named requests can be used by other tests
 			  makes_request :match
 			  
@@ -30,27 +50,21 @@ module InfernoTemplate
 
 			  logger= Logger.new(STDOUT)
 			  # create a named client for a group
+			  
 			  fhir_client  do
 				url :url
 			  end
-		 
+			  
 			  run do
-				body = JSON[search_json] 
-				
+					body = JSON[search_json] 
+					custom_headers={'Content-Type': 'application/fhir+json', 'Authorization': 'Bearer ' +access_token};
+					#fhir_operation("Patient/$match", body: body, client: :default, name: :match, headers: { 'Content-Type': 'application/fhir+json', 'Authorization': 'Bearer ' +authorization_bearer_token)
+					fhir_operation("Patient/$match", body: body, client: :default, name: :match, headers:  custom_headers)
 
-				  #puts("request url=" +  url)
-				  #puts("request body= #{body}" )
-				  fhir_operation("Patient/$match", body: body, client: :default, name: :match, headers: { 'Content-Type': 'application/fhir+json' })
+					responseBody= response[:body] 
 
-				  #puts("response body=" +  response[:body])
-				  #fhir_operation("Patient/$match", body: body, client: :default, name: nil, headers: { 'Content-Type': 'application/fhir+json' })
-
-				  
-				  #response_json=response[:body]
-				  output response_json: response[:body]
-				  #output response_json: response_json
-				  assert_response_status(200)
-				  #assert_resource_type(:bundle)
+					output response_json: response[:body] 
+					assert_response_status(200) 
 					 
 			  end
 			end
@@ -127,15 +141,16 @@ module InfernoTemplate
 				 
 			  end      
 			end
-=begin			test do
+			test do
 			  input :response_json 
-
 			  title 'Determine whether or not  the patient.link field references an underlying patient'
 			  description %(Determine whether or not  the patient.link field references an underlying patient    )
+			   
+
 			  run do
 				
 					   
-					response_json={
+=begin					response_json={
 						"resourceType": "Bundle",
 						"id": "a3f7e13c-bdab-4eda-83b0-1b87c1ebaf4f",				
 						"type": "searchset",
@@ -549,25 +564,27 @@ module InfernoTemplate
 							}
 						]
 					}
-
-					#responseJSON = JSON.parse(response_json)
-					tmp=JSON[response_json]
-					responseJSON=JSON.parse(tmp)
+=end
+					responseJSON = JSON.parse(response_json)
+					#tmp=JSON[response_json]
+					#responseJSON=JSON.parse(tmp)
 					i=0
 					responseJSON["entry"].each do |item|		 
 						puts "got here"
 						patientLinkList= item["resource"]["link"] 
 						puts "****patient Link List=#{patientLinkList}"
-						patientLinkList.each do |patient_link|
-							puts "patient_link=#{patient_link}"
-							patientURL=patient_link["other"]["reference"]
-							puts "PatientLink URL=#{patientURL}"
-							patientID=patientURL.sub("Patient/","");
-							#fhir_operation(patientURL, body: "", client: :default, name: nil, headers: { 'Content-Type': 'application/fhir+json' })
-							fhir_read(:patient, patientID, client: :default)
-							assert_response_status(200)
-							#assert_resource_type(:resource)
-							i=i+1
+						if !patientLinkList.nil?
+							patientLinkList.each do |patient_link|
+								puts "patient_link=#{patient_link}"
+								patientURL=patient_link["other"]["reference"]
+								puts "PatientLink URL=#{patientURL}"
+								patientID=patientURL.sub("Patient/","");
+								#fhir_operation(patientURL, body: "", client: :default, name: nil, headers: { 'Content-Type': 'application/fhir+json' })
+								fhir_read(:patient, patientID, client: :with_custom_headers)
+								assert_response_status(200)
+								#assert_resource_type(:resource)
+								i=i+1
+							end
 						end
 				end
 				   
@@ -575,7 +592,7 @@ module InfernoTemplate
 				   
 				end
  			end 
-=end			
+ 			
 			test do 
 				input :response_json 
 				title 'Determine whether the weighted score of the returned patient resource is in compliance 
