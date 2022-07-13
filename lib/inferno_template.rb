@@ -12,10 +12,17 @@ module InfernoTemplate
     input :url
 
     # All FHIR requests in this suite will use this FHIR client
-    fhir_client do
+    #fhir_client do
+    #  url :url
+    #end
+    fhir_client  do
       url :url
     end
 
+    fhir_client :with_custom_headers do
+      url :url
+      bearer_token :access_token
+    end
     # Tests and TestGroups can be defined inline
     group do
       id :capability_statement
